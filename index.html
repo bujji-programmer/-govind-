@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Advanced Gesture Galaxy System</title>
+
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  background: black;
+}
+
+video {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  opacity: 0.12;
+}
+
+canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+#status, #debug {
+  position: absolute;
+  color: white;
+  font-family: monospace;
+}
+
+#status {
+  bottom: 15px;
+  width: 100%;
+  text-align: center;
+}
+
+#debug {
+  top: 10px;
+  left: 10px;
+  color: lime;
+}
+</style>
+</head>
+
+<body>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
+
+<div id="status">Loading galaxy...</div>
+<div id="debug">Waiting hand...</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const status = document.getElementById("status");
+const debug = document.getElementById("debug");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+window.addEventListener("resize", () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+});
+
+const NAME = "GOVIND";
+
+// 🌠 STAR SYSTEM
+let stars = [];
+
+for (let i = 0; i < 400; i++) {
+  stars.push({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    z: Math.random(),
+    angle: Math.random() * Math.PI * 2,
+    radius: Math.random() * 300,
+    speed: 0.002 + Math.random() * 0.003
+  });
+}
+
+let mode = "scatter";
+
+// 🖐️ HAND TRACKING
+const hands = new Hands({
+  locateFile: (file) =>
+    `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+});
+
+hands.setOptions({
+  maxNumHands: 1,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7,
+});
+
+// ✋ finger detection
+function countFingers(lm) {
+  const tips = [8,12,16,20];
+  let count = 0;
+
+  for (let i = 0; i < tips.length; i++) {
+    if (lm[tips[i]].y < lm[tips[i]-2].y) {
+      count++;
+    }
+  }
+  return count;
+}
+
+hands.onResults((results) => {
+
+  if (!results.multiHandLandmarks?.length) {
+    debug.innerText = "No hand detected";
+    return;
+  }
+
+  const lm = results.multiHandLandmarks[0];
+  let fingers = countFingers(lm);
+
+  if (fingers === 0) mode = "collapse";
+  else if (fingers >= 4) mode = "expand";
+  else mode = "rotate";
+
+  debug.innerText = "Fingers: " + fingers + " | Mode: " + mode;
+});
+
+// 📷 CAMERA
+const camera = new Camera(video, {
+  onFrame: async () => {
+    await hands.send({ image: video });
+  },
+  width: 1280,
+  height: 720,
+});
+
+camera.start().then(() => {
+  status.innerText = "Galaxy Ready ✨ Show your hand";
+});
+
+// 🌌 ANIMATION LOOP
+function animate() {
+
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  let cx = canvas.width / 2;
+  let cy = canvas.height / 2;
+
+  stars.forEach((s, i) => {
+
+    let tx, ty;
+
+    if (mode === "collapse") {
+
+      // 🌌 BLACK HOLE EFFECT
+      let angle = s.angle + performance.now() * s.speed;
+      let r = 50 + s.z * 80;
+
+      tx = cx + Math.cos(angle) * r;
+      ty = cy + Math.sin(angle) * r;
+
+    } 
+    else if (mode === "expand") {
+
+      // 🌠 EXPANDING GALAXY
+      tx = s.x + (Math.cos(s.angle) * s.radius);
+      ty = s.y + (Math.sin(s.angle) * s.radius);
+
+      s.angle += s.speed;
+
+    } 
+    else {
+
+      // 🌌 ROTATION MODE
+      tx = cx + Math.cos(s.angle + performance.now()*0.0005) * (150 + s.z*200);
+      ty = cy + Math.sin(s.angle + performance.now()*0.0005) * (150 + s.z*200);
+    }
+
+    // 🧲 SMOOTH MOVEMENT
+    s.x += (tx - s.x) * (0.04 + s.z * 0.02);
+    s.y += (ty - s.y) * (0.04 + s.z * 0.02);
+
+    // 🌟 depth size
+    let size = 1 + s.z * 2;
+
+    ctx.fillStyle = mode === "collapse" ? "#00f5ff" : "#ffffff";
+    ctx.fillRect(s.x, s.y, size, size);
+  });
+
+  // 🌌 NAME FORMATION (center glow)
+  if (mode === "collapse") {
+    ctx.fillStyle = "#00f5ff";
+    ctx.font = "bold 60px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(NAME, canvas.width/2, canvas.height/2);
+  }
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+
+</body>
+</html>
